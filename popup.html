@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #1c1c1e;
+                --card-bg: rgba(44, 44, 46, 0.75);
+                --text-main: #f5f5f7;
+                --text-sec: #98989d;
+            }
+
+            input[type="text"] {
+                background: #1c1c1e;
+                color: #f5f5f7;
+                border: 1px solid #3a3a3c;
+            }
+
+            input[type="text"]:focus {
+                border-color: var(--primary-color);
+            }
+
+            .btn-icon {
+                background: #3a3a3c;
+                color: #f5f5f7;
+            }
+
+            .btn-icon:hover {
+                background: #48484a;
+            }
+
+            .btn-icon.play {
+                background: rgba(52, 199, 89, 0.15);
+            }
+
+            .btn-icon.play:hover {
+                background: rgba(52, 199, 89, 0.25);
+            }
+
+            #searchInput {
+                background: #1c1c1e !important;
+                color: #f5f5f7;
+            }
+
+            .list-item {
+                border-bottom: 1px solid #3a3a3c;
+            }
+
+            /* 深色模式下的下拉框适配 */
+            .custom-dropdown-menu {
+                background: #2c2c2e !important;
+                border-color: #3a3a3c !important;
+            }
+
+            .custom-dropdown-item:hover {
+                background: #3a3a3c !important;
+            }
+
+            select {
+                background: #1c1c1e !important;
+                color: #f5f5f7 !important;
+                border-color: #3a3a3c !important;
+            }
+        }
+
+        :root {
+            --primary-color: #34c759;
+            --bg-color: #f5f5f7;
+            --card-bg: rgba(255, 255, 255, 0.75);
+            --text-main: #1d1d1f;
+            --text-sec: #86868b;
+            --border-radius: 16px;
+        }
+
+        body {
+            width: 360px;
+            margin: 0;
+            padding: 16px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-main);
+        }
+
+        .header {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            background: var(--card-bg);
+            padding: 12px 16px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .icon {
+            font-size: 20px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #e5e5ea;
+            transition: .3s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        input:checked+.slider {
+            background-color: var(--primary-color);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(20px);
+        }
+
+        .volume-card {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .volume-card span {
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            background: #e5e5ea;
+            height: 6px;
+            border-radius: 3px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #ffffff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+        }
+
+        .card {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+        }
+
+        .card h4 {
+            margin: 0 0 12px 0;
+            font-size: 14px;
+            color: var(--text-sec);
+            font-weight: 500;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 14px;
+            outline: none;
+            transition: border 0.2s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary-color);
+        }
+
+        input[type="file"] {
+            font-size: 12px;
+            margin-bottom: 10px;
+            width: 100%;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        button.outline {
+            background: transparent;
+            color: var(--text-main);
+            border: 1px solid #d2d2d7;
+        }
+
+        .list-container {
+            max-height: 220px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .list-container::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .list-container::-webkit-scrollbar-thumb {
+            background: #d2d2d7;
+            border-radius: 2px;
+        }
+
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #f2f2f7;
+            font-size: 13px;
+        }
+
+        .list-item:last-child {
+            border-bottom: none;
+        }
+
+        .item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            overflow: hidden;
+        }
+
+        .item-title {
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .item-sub {
+            color: var(--text-sec);
+            font-size: 11px;
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .btn-icon {
+            background: #f2f2f7;
+            color: var(--text-main);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            min-width: 44px;
+            text-align: center;
+            width: auto !important;
+        }
+
+        .btn-icon:hover {
+            background: #e5e5ea;
+        }
+
+        .btn-icon.del {
+            color: #ff3b30;
+        }
+
+        .btn-icon.play {
+            color: var(--primary-color);
+            background: #eaf8ed;
+        }
+
+        .btn-icon.play:hover {
+            background: #d4f1db;
+        }
+
+        /* 🌟 事件过滤复选框样式 */
+        .filter-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            font-size: 13px;
+        }
+
+        .filter-group label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+        }
+
+        .filter-group input[type="checkbox"] {
+            margin: 0;
+            cursor: pointer;
+            accent-color: var(--primary-color);
+        }
+
+        /* 🌟 极客版可搜索下拉框组件 CSS */
+        .custom-select {
+            position: relative;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .custom-select-trigger {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 14px;
+            background: transparent;
+            cursor: pointer;
+            text-align: left;
+            color: var(--text-main);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .custom-dropdown-menu {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.95) !important;
+            border: 1px solid var(--primary-color);
+            border-radius: 8px;
+            z-index: 999;
+            margin-top: 4px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            display: none;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+
+        .custom-dropdown-menu.show {
+            display: block;
+        }
+
+        .custom-dropdown-search {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #d2d2d7;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+
+        .custom-dropdown-list {
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .custom-dropdown-list::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .custom-dropdown-list::-webkit-scrollbar-thumb {
+            background: #d2d2d7;
+            border-radius: 2px;
+        }
+
+        .custom-dropdown-item {
+            padding: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .custom-dropdown-item:hover {
+            background: #f2f2f7;
+            color: var(--primary-color);
+        }
+
+        #toast {
+            position: fixed;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            white-space: nowrap;
+        }
+
+        #toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            backdrop-filter: blur(2px);
+        }
+
+        .modal {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 16px;
+            width: 280px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal h3 {
+            margin-top: 0;
+            font-size: 16px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+    
+        .tabs {
+            display: flex;
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 4px;
+            margin-bottom: 16px;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+        }
+
+        .tab-btn {
+            flex: 1;
+            background: transparent;
+            color: var(--text-sec);
+            font-size: 13px;
+            font-weight: 500;
+            padding: 8px 0;
+            border-radius: calc(var(--border-radius) - 4px);
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background: var(--bg-color);
+            color: var(--text-main);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+    
+    </style>
+</head>
+
+<body>
+
+    <div id="toast">操作成功</div>
+
+    <div class="header">
+        <h2 class="header-title"><span class="icon">◉</span> 行情语音助手</h2>
+        <div style="display: flex; align-items: center; padding: 4px 10px; border-radius: 14px; border: 1px solid #d2d2d7; font-size: 12px; color: var(--text-sec); background: var(--card-bg);">
+            <span style="font-weight: 500;">本地版</span>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="tab-twitter">🐦 推特监控</button>
+        <button class="tab-btn" data-tab="tab-wallet">💰 钱包监控</button>
+        <button class="tab-btn" data-tab="tab-settings">⚙️ 系统设置</button>
+    </div>
+
+    <!-- 推特监控 Tab -->
+    <div id="tab-twitter" class="tab-content active">
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h4 style="margin: 0;">未备注账号发推提醒</h4>
+                <label class="switch">
+                    <input type="checkbox" id="playDefaultToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div id="ttsSubSetting" style="display: flex; justify-content: space-between; align-items: center; padding-left: 12px; border-left: 2px solid #e5e5ea; margin-left: 4px; transition: opacity 0.3s ease;">
+                <h4 style="margin: 0; font-size: 13px; color: var(--text-sec);">↳ 使用 AI 语音念昵称 (替代默认提示音)</h4>
+                <label class="switch" style="transform: scale(0.9); transform-origin: right center;">
+                    <input type="checkbox" id="enableTTSToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="card">
+            <h4>自定义音频库</h4>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                <input type="file" id="customAudioFile" multiple accept=".mp3,.wav,.ogg,.aac,.m4a,.flac,.zip" style="font-size: 12px; flex: 1;">
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button id="uploadBtn" class="outline">导入音频(支持zip)</button>
+                <button id="exportAudioZipBtn" class="outline" style="color: var(--primary-color); border-color: var(--primary-color);">导出ZIP备份</button>
+            </div>
+            <div id="customAudioList" class="list-container" style="margin-top: 10px;"></div>
+        </div>
+
+        <div class="card">
+            <h4>监听事件类型</h4>
+            <div class="filter-group">
+                <label><input type="checkbox" id="filterTweet" checked> 推文</label>
+                <label><input type="checkbox" id="filterRepost" checked> 转发</label>
+                <label><input type="checkbox" id="filterReply" checked> 回复</label>
+                <label><input type="checkbox" id="filterQuote" checked> 引用</label>
+                <label><input type="checkbox" id="filterOther" checked> 其他(置顶/头像等)</label>
+            </div>
+        </div>
+
+        <div class="card" style="position: relative; z-index: 10;">
+            <h4>设置专属提示音</h4>
+            <input type="text" id="twitterId" placeholder="输入 Twitter ID (如: binance)">
+            <input type="text" id="twitterRemark" placeholder="备注 (选填，如: 币安官推)">
+
+            <div class="custom-select" id="addSelectWrapper">
+                <button class="custom-select-trigger" id="addSelectTrigger"><span>默认提示音</span> ▾</button>
+                <input type="hidden" id="addAudioValue" value="default.MP3">
+                <input type="hidden" id="addAudioName" value="默认提示音">
+                <div class="custom-dropdown-menu" id="addSelectMenu">
+                    <input type="text" class="custom-dropdown-search" id="addSelectSearch" placeholder="搜索音频名称...">
+                    <div class="custom-dropdown-list" id="addSelectList"></div>
+                </div>
+            </div>
+
+            <button id="addRuleBtn">添加专属音</button>
+        </div>
+
+        <div class="card" style="margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h4 style="margin: 0;">已配置规则</h4>
+            </div>
+            <input type="text" id="searchInput" placeholder="🔍 搜索推特 ID 或备注..."
+                style="margin-bottom: 12px; background: #f2f2f7; border: none; padding: 8px 12px; border-radius: 8px; font-size: 13px;">
+            <div id="rulesList" class="list-container"></div>
+        </div>
+
+        <div class="card">
+            <h4>规则管理 (JSON)</h4>
+            <div style="display: flex; gap: 10px;">
+                <button id="exportRulesBtn" class="outline">导出规则</button>
+                <button id="importRulesBtn" class="outline">导入规则</button>
+                <input type="file" id="importRulesFile" accept=".json" style="display: none;">
+            </div>
+        </div>
+    </div>
+    
+    <!-- 钱包监控 Tab -->
+    <div id="tab-wallet" class="tab-content">
+        <div class="card">
+            <h4>💰 钱包监控设置</h4>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <label style="display: flex; align-items: center; gap: 4px; font-size: 13px; margin: 0;"><input type="checkbox" id="filterBuy" checked> 买入(建仓/加仓)</label>
+                        <span class="toggle-panel-btn" data-target="buyCooldownPanel" style="cursor: pointer; font-size: 10px; color: var(--text-sec); padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.05); user-select: none;">⚙️ ▼</span>
+                    </div>
+                    <button id="testWalletBuyBtn" class="btn-icon play" style="padding: 4px 12px; font-size: 12px;">试听 🎵</button>
+                </div>
+                <!-- 买入冷却器子选项 -->
+                <div id="buyCooldownPanel" style="display: none; flex-direction: column; gap: 4px; padding-left: 20px; border-left: 2px solid #e5e5ea; margin-left: 4px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-sec); margin: 0; white-space: nowrap;">
+                            <input type="checkbox" id="buyCooldownEnabled"> ↳ 🪙 同代币冷却
+                        </label>
+                        <input type="range" id="buyCooldownTime" min="5" max="60" step="5" value="15" style="flex: 1; height: 4px; accent-color: var(--primary-color);">
+                        <span id="buyCooldownLabel" style="font-size: 11px; color: var(--text-sec); min-width: 28px; text-align: right;">15s</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-sec); margin: 0; white-space: nowrap;">
+                            <input type="checkbox" id="buyAddrCooldownEnabled"> ↳ 👛 同钱包冷却
+                        </label>
+                        <input type="range" id="buyAddrCooldownTime" min="5" max="60" step="5" value="15" style="flex: 1; height: 4px; accent-color: #34c759;">
+                        <span id="buyAddrCooldownLabel" style="font-size: 11px; color: var(--text-sec); min-width: 28px; text-align: right;">15s</span>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <label style="display: flex; align-items: center; gap: 4px; font-size: 13px; margin: 0;"><input type="checkbox" id="filterSellReduce" checked> 卖出(减仓)</label>
+                        <span class="toggle-panel-btn" data-target="sellReduceCooldownPanel" style="cursor: pointer; font-size: 10px; color: var(--text-sec); padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.05); user-select: none;">⚙️ ▼</span>
+                    </div>
+                    <button id="testWalletSellReduceBtn" class="btn-icon play" style="padding: 4px 12px; font-size: 12px;">试听 🎵</button>
+                </div>
+                <!-- 减仓冷却器子选项 -->
+                <div id="sellReduceCooldownPanel" style="display: none; flex-direction: column; gap: 4px; padding-left: 20px; border-left: 2px solid #e5e5ea; margin-left: 4px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-sec); margin: 0; white-space: nowrap;">
+                            <input type="checkbox" id="sellReduceCooldownEnabled"> ↳ 🪙 同代币冷却
+                        </label>
+                        <input type="range" id="sellReduceCooldownTime" min="5" max="60" step="5" value="15" style="flex: 1; height: 4px; accent-color: var(--primary-color);">
+                        <span id="sellReduceCooldownLabel" style="font-size: 11px; color: var(--text-sec); min-width: 28px; text-align: right;">15s</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-sec); margin: 0; white-space: nowrap;">
+                            <input type="checkbox" id="sellReduceAddrCooldownEnabled"> ↳ 👛 同钱包冷却
+                        </label>
+                        <input type="range" id="sellReduceAddrCooldownTime" min="5" max="60" step="5" value="15" style="flex: 1; height: 4px; accent-color: #34c759;">
+                        <span id="sellReduceAddrCooldownLabel" style="font-size: 11px; color: var(--text-sec); min-width: 28px; text-align: right;">15s</span>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <label style="display: flex; align-items: center; gap: 4px; font-size: 13px; margin: 0;"><input type="checkbox" id="filterSellClear" checked> 卖出(清仓)</label>
+                        <span class="toggle-panel-btn" data-target="sellClearCooldownPanel" style="cursor: pointer; font-size: 10px; color: var(--text-sec); padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.05); user-select: none;">⚙️ ▼</span>
+                    </div>
+                    <button id="testWalletSellClearBtn" class="btn-icon play" style="padding: 4px 12px; font-size: 12px;">试听 🎵</button>
+                </div>
+                <!-- 清仓冷却器子选项 -->
+                <div id="sellClearCooldownPanel" style="display: none; flex-direction: column; gap: 4px; padding-left: 20px; border-left: 2px solid #e5e5ea; margin-left: 4px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-sec); margin: 0; white-space: nowrap;">
+                            <input type="checkbox" id="sellClearAddrCooldownEnabled"> ↳ 👛 同钱包冷却
+                        </label>
+                        <input type="range" id="sellClearAddrCooldownTime" min="5" max="60" step="5" value="15" style="flex: 1; height: 4px; accent-color: #34c759;">
+                        <span id="sellClearAddrCooldownLabel" style="font-size: 11px; color: var(--text-sec); min-width: 28px; text-align: right;">15s</span>
+                    </div>
+                </div>
+            </div>
+            <!-- 金额范围筛选 -->
+            <div style="margin-bottom: 10px;">
+                <span style="font-size: 12px; color: var(--text-sec); display: block; margin-bottom: 4px;">金额</span>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <div style="position: relative; flex: 1;">
+                        <input type="number" id="walletMinAmount" placeholder="不限" style="width: 100%; padding: 4px 20px 4px 8px; border: 1px solid #d2d2d7; border-radius: 6px; background: transparent; color: var(--text-main); font-size: 12px; box-sizing: border-box;">
+                        <span style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text-sec); pointer-events: none;">$</span>
+                    </div>
+                    <span style="font-size: 12px; color: var(--text-sec); font-weight: 500;">to</span>
+                    <div style="position: relative; flex: 1;">
+                        <input type="number" id="walletMaxAmount" placeholder="不限" style="width: 100%; padding: 4px 20px 4px 8px; border: 1px solid #d2d2d7; border-radius: 6px; background: transparent; color: var(--text-main); font-size: 12px; box-sizing: border-box;">
+                        <span style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text-sec); pointer-events: none;">$</span>
+                    </div>
+                </div>
+            </div>
+            <!-- 市值范围筛选 -->
+            <div style="margin-bottom: 10px;">
+                <span style="font-size: 12px; color: var(--text-sec); display: block; margin-bottom: 4px;">市值</span>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <div style="position: relative; flex: 1;">
+                        <input type="number" id="walletMinMcap" placeholder="不限" style="width: 100%; padding: 4px 24px 4px 8px; border: 1px solid #d2d2d7; border-radius: 6px; background: transparent; color: var(--text-main); font-size: 12px; box-sizing: border-box;">
+                        <span style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text-sec); pointer-events: none;">K</span>
+                    </div>
+                    <span style="font-size: 12px; color: var(--text-sec); font-weight: 500;">to</span>
+                    <div style="position: relative; flex: 1;">
+                        <input type="number" id="walletMaxMcap" placeholder="不限" style="width: 100%; padding: 4px 24px 4px 8px; border: 1px solid #d2d2d7; border-radius: 6px; background: transparent; color: var(--text-main); font-size: 12px; box-sizing: border-box;">
+                        <span style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text-sec); pointer-events: none;">K</span>
+                    </div>
+                </div>
+            </div>
+            <!-- 代币时间范围筛选 -->
+            <div style="margin-bottom: 12px;">
+                <span style="font-size: 12px; color: var(--text-sec); display: block; margin-bottom: 4px;">代币时间</span>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <div style="position: relative; flex: 1;">
+                        <input type="number" id="walletMinAge" placeholder="不限" style="width: 100%; padding: 4px 24px 4px 8px; border: 1px solid #d2d2d7; border-radius: 6px; background: transparent; color: var(--text-main); font-size: 12px; box-sizing: border-box;">
+                        <span style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text-sec); pointer-events: none;">m</span>
+                    </div>
+                    <span style="font-size: 12px; color: var(--text-sec); font-weight: 500;">to</span>
+                    <div style="position: relative; flex: 1;">
+                        <input type="number" id="walletMaxAge" placeholder="不限" style="width: 100%; padding: 4px 24px 4px 8px; border: 1px solid #d2d2d7; border-radius: 6px; background: transparent; color: var(--text-main); font-size: 12px; box-sizing: border-box;">
+                        <span style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text-sec); pointer-events: none;">m</span>
+                    </div>
+                </div>
+            </div>
+            <textarea id="walletDictInput" placeholder='请前往 GMGN 网页端，复制导出的带备注钱包 JSON 数据并粘贴至此处。' style="width: 100%; height: 80px; padding: 8px; border: 1px solid #d2d2d7; border-radius: 8px; background: transparent; color: var(--text-main); font-size: 12px; margin-bottom: 8px; box-sizing: border-box; resize: vertical;"></textarea>
+            <div style="display: flex; gap: 10px;">
+                <button id="importWalletDictBtn" class="outline">导入钱包</button>
+                <button id="clearWalletDictBtn" class="outline" style="color: #ff3b30; border-color: #ff3b30;">清空</button>
+            </div>
+            <div id="walletDictStatus" style="font-size: 12px; color: var(--text-sec); margin-top: 8px;">已导入: 0 个地址</div>
+            <input type="text" id="walletSearchInput" placeholder="🔍 搜索钱包地址或备注..." style="margin-top: 12px; background: #f2f2f7; border: none; padding: 8px 12px; border-radius: 8px; font-size: 13px; width: 100%; box-sizing: border-box;">
+            <div id="walletList" class="list-container" style="margin-top: 8px; max-height: 200px;"></div>
+            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed #d2d2d7;">
+                <span style="font-size: 12px; color: var(--text-sec); display: block; margin-bottom: 6px;">手动添加单地址 <i style="color: #ff9500; font-size: 11px;">(注: 需在GMGN页面关注该钱包)</i></span>
+                <div style="display: flex; gap: 6px; margin-bottom: 6px;">
+                    <input type="text" id="customWalletName" placeholder="如: 聪明钱A" style="flex: 1; padding: 6px; border: 1px solid #d2d2d7; border-radius: 6px; background: transparent; color: var(--text-main); font-size: 12px; box-sizing: border-box;">
+                    <input type="text" id="customWalletAddress" placeholder="0x..." style="flex: 2; padding: 6px; border: 1px solid #d2d2d7; border-radius: 6px; background: transparent; color: var(--text-main); font-size: 12px; box-sizing: border-box;">
+                </div>
+                <button id="addCustomWalletBtn" class="outline" style="width: 100%; border-color: #34c759; color: #34c759;">➕ 添加单地址</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 系统设置 Tab -->
+    <div id="tab-settings" class="tab-content">
+        <div class="card">
+            <h4>系统控制</h4>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-size: 14px; font-weight: 500;">总开关 (拦截所有通信)</span>
+                <label class="switch">
+                    <input type="checkbox" id="masterToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div style="font-size: 11px; color: #ff9500; padding: 0 4px; line-height: 1.4;">
+                * 注意：实际播报音量受 GMGN 网页所在标签页系统音量影响，请确保未将网页静音。
+            </div>
+        </div>
+
+        <div class="card">
+            <h4>AI 语音来源</h4>
+            <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                <select id="ttsProviderSelect" style="flex: 1; padding: 6px; border-radius: 6px; border: 1px solid #d2d2d7; font-size: 12px; background: transparent; color: var(--text-main); outline: none;">
+                    <option value="local">本地系统语音</option>
+                    <option value="azure">Azure 官方神经语音</option>
+                </select>
+                <button id="azureTtsTestBtn" class="btn-icon play" style="padding: 4px 12px; font-size: 12px;">试听 🎵</button>
+            </div>
+            <div id="azureTtsPanel" style="display: grid; gap: 8px;">
+                <input type="text" id="azureRegionInput" placeholder="Azure Region，例如 eastasia / eastus" style="padding: 8px; border-radius: 6px; border: 1px solid #d2d2d7; background: transparent; color: var(--text-main); outline: none; font-size: 12px;">
+                <input type="password" id="azureKeyInput" placeholder="填写你自己的 Azure Speech Key，仅保存在本机" style="padding: 8px; border-radius: 6px; border: 1px solid #d2d2d7; background: transparent; color: var(--text-main); outline: none; font-size: 12px;">
+                <select id="azureVoiceSelect" style="padding: 6px; border-radius: 6px; border: 1px solid #d2d2d7; font-size: 12px; background: transparent; color: var(--text-main); outline: none;">
+                    <option value="zh-CN-XiaoxiaoNeural">晓晓 Xiaoxiao (女声)</option>
+                    <option value="zh-CN-XiaoyiNeural">晓伊 Xiaoyi (女声)</option>
+                    <option value="zh-CN-YunjianNeural">云健 Yunjian (男声)</option>
+                    <option value="zh-CN-YunxiNeural">云希 Yunxi (男声)</option>
+                    <option value="zh-CN-YunyangNeural">云扬 Yunyang (男声)</option>
+                    <option value="zh-CN-XiaochenNeural">晓辰 Xiaochen (女声)</option>
+                    <option value="zh-CN-XiaohanNeural">晓涵 Xiaohan (女声)</option>
+                    <option value="zh-CN-XiaomengNeural">晓梦 Xiaomeng (女声)</option>
+                    <option value="zh-CN-XiaomoNeural">晓墨 Xiaomo (女声)</option>
+                    <option value="zh-CN-XiaoqiuNeural">晓秋 Xiaoqiu (女声)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span style="font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 4px;">🐦 推特监控</span>
+                <label class="switch" style="transform: scale(0.9);">
+                    <input type="checkbox" id="enableTwitterToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="volume-card" style="margin-bottom: 12px; padding: 8px 12px;">
+                <span>🔊 音量</span>
+                <input type="range" id="twitterVolume" min="0" max="1.5" step="0.05" value="1">
+                <span id="twitterVolumePercent">100%</span>
+            </div>
+            <div id="twitterTtsConfigPanel">
+                <span style="font-size: 12px; color: var(--text-sec); display: block; margin-bottom: 6px;">🤖 AI 音色设置</span>
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                    <select id="twitterTtsVoiceSelect" style="flex: 1; padding: 6px; border-radius: 6px; border: 1px solid #d2d2d7; font-size: 12px; background: transparent; color: var(--text-main); outline: none;">
+                        <option value="Sandy (中文（中国大陆）)">Sandy (中文大陆)</option>
+                        <option value="Shelley (中文（中国大陆）)">Shelley (中文大陆)</option>
+                        <option value="Flo (中文（中国大陆）)">Flo (中文大陆)</option>
+                        <option value="Eddy (中文（中国大陆）)">Eddy (中文大陆)</option>
+                        <option value="Tingting">Tingting (中文大陆)</option>
+                    </select>
+                    <button id="twitterTtsTestBtn" class="btn-icon play" style="padding: 4px 12px; font-size: 12px;">试听 🎵</button>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <select id="twitterTtsRateSelect" style="flex: 1; padding: 6px; border-radius: 6px; border: 1px solid #d2d2d7; font-size: 12px; background: transparent; color: var(--text-main); outline: none;">
+                        <option value="+0%">语速: 正常</option>
+                        <option value="+15%">语速: 较快</option>
+                        <option value="+30%">语速: 极速</option>
+                        <option value="+50%">语速: 起飞</option>
+                        <option value="+75%">语速: 闪电</option>
+                    </select>
+                    <select id="twitterTtsPitchSelect" style="flex: 1; padding: 6px; border-radius: 6px; border: 1px solid #d2d2d7; font-size: 12px; background: transparent; color: var(--text-main); outline: none;">
+                        <option value="-5%">音调: 偏低</option>
+                        <option value="+0%">音调: 正常</option>
+                        <option value="+5%">音调: 偏高</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span style="font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 4px;">💰 钱包监控</span>
+                <label class="switch" style="transform: scale(0.9);">
+                    <input type="checkbox" id="enableWalletToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="volume-card" style="margin-bottom: 12px; padding: 8px 12px;">
+                <span>🔊 音量</span>
+                <input type="range" id="walletVolume" min="0" max="1.5" step="0.05" value="1">
+                <span id="walletVolumePercent">100%</span>
+            </div>
+            <div id="walletTtsConfigPanel">
+                <span style="font-size: 12px; color: var(--text-sec); display: block; margin-bottom: 6px;">🤖 AI 音色设置</span>
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                    <select id="walletTtsVoiceSelect" style="flex: 1; padding: 6px; border-radius: 6px; border: 1px solid #d2d2d7; font-size: 12px; background: transparent; color: var(--text-main); outline: none;">
+                        <option value="Sandy (中文（中国大陆）)">Sandy (中文大陆)</option>
+                        <option value="Shelley (中文（中国大陆）)">Shelley (中文大陆)</option>
+                        <option value="Flo (中文（中国大陆）)">Flo (中文大陆)</option>
+                        <option value="Eddy (中文（中国大陆）)">Eddy (中文大陆)</option>
+                        <option value="Tingting">Tingting (中文大陆)</option>
+                    </select>
+                    <button id="walletTtsTestBtn" class="btn-icon play" style="padding: 4px 12px; font-size: 12px;">试听 🎵</button>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <select id="walletTtsRateSelect" style="flex: 1; padding: 6px; border-radius: 6px; border: 1px solid #d2d2d7; font-size: 12px; background: transparent; color: var(--text-main); outline: none;">
+                        <option value="+0%">语速: 正常</option>
+                        <option value="+15%">语速: 较快</option>
+                        <option value="+30%">语速: 极速</option>
+                        <option value="+50%">语速: 起飞</option>
+                        <option value="+75%">语速: 闪电</option>
+                    </select>
+                    <select id="walletTtsPitchSelect" style="flex: 1; padding: 6px; border-radius: 6px; border: 1px solid #d2d2d7; font-size: 12px; background: transparent; color: var(--text-main); outline: none;">
+                        <option value="-5%">音调: 偏低</option>
+                        <option value="+0%">音调: 正常</option>
+                        <option value="+5%">音调: 偏高</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="editModal">
+        <div class="modal">
+            <h3>编辑规则</h3>
+            <input type="text" id="editTwitterId" readonly style="background:#f5f5f7; color:var(--text-sec)">
+            <input type="text" id="editTwitterRemark" placeholder="备注 (选填)">
+
+            <div class="custom-select" id="editSelectWrapper">
+                <button class="custom-select-trigger" id="editSelectTrigger"><span>默认提示音</span> ▾</button>
+                <input type="hidden" id="editAudioValue" value="default.MP3">
+                <input type="hidden" id="editAudioName" value="默认提示音">
+                <div class="custom-dropdown-menu" id="editSelectMenu">
+                    <input type="text" class="custom-dropdown-search" id="editSelectSearch" placeholder="搜索音频名称...">
+                    <div class="custom-dropdown-list" id="editSelectList"></div>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button id="cancelEditBtn" class="outline">取消</button>
+                <button id="saveEditBtn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 钱包编辑弹窗 -->
+    <div class="modal-overlay" id="walletEditModal">
+        <div class="modal">
+            <h3>编辑钱包备注</h3>
+            <input type="text" id="editWalletAddress" readonly style="background:#f5f5f7; color:var(--text-sec); margin-bottom: 8px; width: 100%; padding: 10px; border: 1px solid #d2d2d7; border-radius: 8px; box-sizing: border-box; font-size: 12px;">
+            <input type="text" id="editWalletName" placeholder="钱包备注" style="width: 100%; padding: 10px; border: 1px solid #d2d2d7; border-radius: 8px; box-sizing: border-box; font-size: 14px;">
+            <div class="modal-actions">
+                <button id="cancelWalletEditBtn" class="outline">取消</button>
+                <button id="saveWalletEditBtn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="lib/jszip.min.js"></script>
+    <script src="popup.js"></script>
+</body>
+</html>

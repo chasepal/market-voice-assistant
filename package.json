@@ -1,0 +1,9 @@
+{
+  "name": "market-voice-assistant",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local Chrome extension for GMGN voice alerts with user-owned Azure Speech configuration.",
+  "scripts": {
+    "check": "node scripts/check-extension-package.mjs . && node --check background.js && node --check content.js && node --check inject.js && node --check popup.js"
+  }
+}
