@@ -43,6 +43,10 @@ Azure Key 只保存在使用者自己浏览器的 Chrome storage 里，不在仓
 
 见 [PRIVACY.md](PRIVACY.md)。
 
+## 更新日志
+
+见 [CHANGELOG.md](CHANGELOG.md)。
+
 ## 本地检查
 
 ```bash
