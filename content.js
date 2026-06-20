@@ -16,8 +16,10 @@ const DEFAULT_EVENT_FILTERS = { tweet: true, repost: true, reply: true, quote: t
 const DEFAULT_WALLET_FILTERS = { buy: true, sellReduce: true, sellClear: true, minAmount: 0 };
 const STATUS_HINT_ID = 'gmgn-companion-local-status-hint';
 const STATUS_INDICATOR_ID = 'gmgn-companion-local-status-indicator';
-const CROSS_TAB_EVENT_STORAGE_PREFIX = 'gmgn_companion_local_event_v2:';
+const LEGACY_CROSS_TAB_EVENT_STORAGE_PREFIX = 'gmgn_companion_local_event_v2:';
+const CROSS_TAB_EVENT_STORAGE_KEY = 'gmgnCompanionCrossTabEventsV3';
 const CROSS_TAB_EVENT_LOCK_PREFIX = 'gmgn-companion-local-event:';
+const CROSS_TAB_EVENT_MAX_RECORDS = 300;
 const TWITTER_EVENT_TTL_MS = 6000;
 const WALLET_TX_EVENT_TTL_MS = 45000;
 const WALLET_FALLBACK_EVENT_TTL_MS = 8000;
@@ -26,6 +28,19 @@ const TAB_INSTANCE_ID = (globalThis.crypto && crypto.randomUUID)
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 let statusHintTimer = null;
 let extensionContextStale = false;
+
+function cleanupLegacyPageEventStorage() {
+    try {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(LEGACY_CROSS_TAB_EVENT_STORAGE_PREFIX)) {
+                localStorage.removeItem(key);
+            }
+        }
+    } catch (e) { }
+}
+
+cleanupLegacyPageEventStorage();
 
 function isExtensionContextReady() {
     return typeof chrome !== 'undefined' && !!chrome.runtime && !!chrome.runtime.id && !!chrome.storage;
@@ -280,17 +295,14 @@ function initDefaultConfig(result = {}) {
 
 // ════════════════════════════════════════════════════════════
 // 🔒 跨 Tab 事件去重引擎
-// BroadcastChannel 只做通知；真正抢占播放权用 Web Locks + localStorage。
+// BroadcastChannel 只做通知；真正抢占播放权用 Web Locks + chrome.storage.local。
 // 这样多个 GMGN 标签页同时收到同一条消息时，也只有一个页面会拿到播放权。
+// 注意：不要写页面 localStorage，避免挤占 gmgn.ai 的站点存储导致主站崩溃。
 // ════════════════════════════════════════════════════════════
 const otherTabPlayedEvents = new Map(); // fingerprint -> { owner, ts, expires }
 
 function normalizeEventKey(key) {
     return encodeURIComponent(String(key)).slice(0, 220);
-}
-
-function getEventStorageKey(key) {
-    return `${CROSS_TAB_EVENT_STORAGE_PREFIX}${normalizeEventKey(key)}`;
 }
 
 function isActiveEventRecord(record, now = Date.now()) {
@@ -305,25 +317,61 @@ function rememberEventInMemory(key, record) {
     }
 }
 
-function readStoredEventRecord(key) {
-    try {
-        const raw = localStorage.getItem(getEventStorageKey(key));
-        if (!raw) return null;
-        const record = JSON.parse(raw);
-        if (!isActiveEventRecord(record)) {
-            localStorage.removeItem(getEventStorageKey(key));
-            return null;
+function getChromeLocal(keys) {
+    return new Promise((resolve) => {
+        if (!isExtensionContextReady()) {
+            resolve({});
+            return;
         }
-        rememberEventInMemory(key, record);
-        return record;
-    } catch (e) {
-        return null;
-    }
+        try {
+            chrome.storage.local.get(keys, (result) => {
+                if (chrome.runtime.lastError) {
+                    resolve({});
+                    return;
+                }
+                resolve(result || {});
+            });
+        } catch (e) {
+            resolve({});
+        }
+    });
 }
 
-function writeStoredEventRecord(key, ttlMs) {
+function setChromeLocal(items) {
+    return new Promise((resolve) => {
+        if (!isExtensionContextReady()) {
+            resolve();
+            return;
+        }
+        try {
+            chrome.storage.local.set(items, () => resolve());
+        } catch (e) {
+            resolve();
+        }
+    });
+}
+
+function pruneStoredEventRecords(records, now = Date.now()) {
+    const entries = Object.entries(records || {})
+        .filter(([, record]) => isActiveEventRecord(record, now))
+        .sort((a, b) => (Number(b[1].ts) || 0) - (Number(a[1].ts) || 0))
+        .slice(0, CROSS_TAB_EVENT_MAX_RECORDS);
+    return Object.fromEntries(entries);
+}
+
+async function readStoredEventRecord(key) {
+    const storageKey = normalizeEventKey(key);
+    const result = await getChromeLocal([CROSS_TAB_EVENT_STORAGE_KEY]);
+    const records = result[CROSS_TAB_EVENT_STORAGE_KEY] || {};
+    const record = records[storageKey];
+    if (!isActiveEventRecord(record)) return null;
+    rememberEventInMemory(key, record);
+    return record;
+}
+
+async function writeStoredEventRecord(key, ttlMs) {
     const now = Date.now();
-    const existing = getKnownEventRecord(key);
+    const existing = await getKnownEventRecord(key);
     const record = existing && existing.owner === TAB_INSTANCE_ID ? {
         ...existing,
         expires: Math.max(Number(existing.expires) || 0, now + ttlMs)
@@ -333,24 +381,26 @@ function writeStoredEventRecord(key, ttlMs) {
         expires: now + ttlMs
     };
     rememberEventInMemory(key, record);
-    try {
-        localStorage.setItem(getEventStorageKey(key), JSON.stringify(record));
-    } catch (e) { }
+    const storageKey = normalizeEventKey(key);
+    const result = await getChromeLocal([CROSS_TAB_EVENT_STORAGE_KEY]);
+    const records = pruneStoredEventRecords(result[CROSS_TAB_EVENT_STORAGE_KEY] || {}, now);
+    records[storageKey] = record;
+    await setChromeLocal({ [CROSS_TAB_EVENT_STORAGE_KEY]: records });
     try {
         audioSyncChannel.postMessage({ type: 'EVENT_PLAYED', key, record });
     } catch (e) { }
     return record;
 }
 
-function getKnownEventRecord(key) {
+async function getKnownEventRecord(key) {
     const memoryRecord = otherTabPlayedEvents.get(key);
     if (isActiveEventRecord(memoryRecord)) return memoryRecord;
     if (memoryRecord) otherTabPlayedEvents.delete(key);
-    return readStoredEventRecord(key);
+    return await readStoredEventRecord(key);
 }
 
-function isEventClaimed(key, { allowOwner = false } = {}) {
-    const record = getKnownEventRecord(key);
+async function isEventClaimed(key, { allowOwner = false } = {}) {
+    const record = await getKnownEventRecord(key);
     if (!record) return false;
     return !(allowOwner && record.owner === TAB_INSTANCE_ID);
 }
@@ -358,30 +408,26 @@ function isEventClaimed(key, { allowOwner = false } = {}) {
 async function claimCrossTabEvent(key, ttlMs, options = {}) {
     if (!key) return true;
     const allowOwner = !!options.allowOwner;
-    const claim = () => {
-        const existing = getKnownEventRecord(key);
+    const claim = async () => {
+        const existing = await getKnownEventRecord(key);
         if (existing) return allowOwner && existing.owner === TAB_INSTANCE_ID;
-        writeStoredEventRecord(key, ttlMs);
+        await writeStoredEventRecord(key, ttlMs);
         return true;
     };
 
     if (navigator.locks && typeof navigator.locks.request === 'function') {
-        let result = false;
         try {
-            await navigator.locks.request(
+            return await navigator.locks.request(
                 `${CROSS_TAB_EVENT_LOCK_PREFIX}${normalizeEventKey(key)}`,
                 { ifAvailable: true },
-                (lock) => {
-                    result = !!lock && claim();
-                }
+                async (lock) => !!lock && await claim()
             );
-            return result;
         } catch (e) {
-            return claim();
+            return await claim();
         }
     }
 
-    return claim();
+    return await claim();
 }
 
 /** 兼容旧调用点：检查事件是否已被别的页面抢占。 */
@@ -391,7 +437,7 @@ function wasPlayedByOtherTab(fingerprint) {
 
 /** 标记事件已播放并广播给其他 Tab。 */
 function markEventPlayed(fingerprint, ttlMs = TWITTER_EVENT_TTL_MS) {
-    writeStoredEventRecord(fingerprint, ttlMs);
+    void writeStoredEventRecord(fingerprint, ttlMs);
 }
 
 // 注入移交至 manifest.json 中的 world: "MAIN" 保证绝对的同步执行

@@ -13,6 +13,26 @@
 2. 刷新所有已经打开的 GMGN 页面。
 3. 在仓库目录运行 `npm run check`，确认资源文件存在。
 
+## `QuotaExceededError: reffer24Code`
+
+这是 GMGN 页面在写自己的 localStorage 时触发的站点存储配额错误。新版扩展已经不再把去重状态写入 GMGN 页面的 localStorage，并会在启动时只清理旧版扩展留下的 `gmgn_companion_local_event_v2:` 前缀记录。
+
+如果你担心清掉登录态，不要直接点「清除全部站点数据」。可以先安装或重新加载新版扩展，然后刷新 GMGN 页面；新版扩展会在页面脚本很早期运行，只删除旧版插件自己的遗留 key。
+
+如果页面已经卡在错误页，可以在 DevTools 的 Console 里手动只清旧插件 key：
+
+```js
+for (let i = localStorage.length - 1; i >= 0; i--) {
+  const key = localStorage.key(i);
+  if (key && key.startsWith('gmgn_companion_local_event_v2:')) {
+    localStorage.removeItem(key);
+  }
+}
+location.reload();
+```
+
+这不会删除 GMGN 的其它 localStorage 项。
+
 ## Azure 试听失败
 
 检查这些项：
