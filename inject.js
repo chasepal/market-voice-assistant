@@ -1,88 +1,136 @@
 (function () {
-    // 动态拼接版本号 (由于改为 world: MAIN 注入，无法直接读取 script.dataset，改为静态显示)
-    console.log(`🚀 [行情语音助手] Inject.js 已启动 (注入机制优化版)`);
+    'use strict';
 
-    // 🛡️ 幂等保护：扩展热更新时 inject.js 会被多次注入
-    // 必须始终使用真正的原生 WebSocket，而不是上一次注入留下的代理
-    // 否则会形成「代理套代理」导致信号丢失或重复
-    if (!window.__GMGN_ORIGINAL_WS) {
-        window.__GMGN_ORIGINAL_WS = window.WebSocket; // 首次注入：保存原生构造函数
+    const LOG_PREFIX = '[Market Voice]';
+    const READY_EVENT = 'MARKET_VOICE_BRIDGE_READY';
+    const PING_EVENT = 'MARKET_VOICE_BRIDGE_PING';
+    const TOGGLE_EVENT = 'GMGN_AUDIO_TOGGLE';
+    const MAX_BATCH_ITEMS = 100;
+    const twitterNameUtils = globalThis.__MARKET_VOICE_TWITTER_NAME_UTILS__;
+
+    const originalWebSocket = window.__MARKET_VOICE_ORIGINAL_WS
+        || window.__GMGN_ORIGINAL_WS
+        || window.WebSocket;
+    if (typeof originalWebSocket !== 'function') return;
+
+    window.__MARKET_VOICE_ORIGINAL_WS = originalWebSocket;
+    window.__GMGN_ORIGINAL_WS = originalWebSocket;
+    window.__GMGN_AUDIO_ENABLED = window.__GMGN_AUDIO_ENABLED !== false;
+    window.__GMGN_USE_TWITTER_REMARK = window.__GMGN_USE_TWITTER_REMARK === true;
+
+    if (window.__MARKET_VOICE_TOGGLE_HANDLER) {
+        window.removeEventListener(TOGGLE_EVENT, window.__MARKET_VOICE_TOGGLE_HANDLER);
     }
-    const OriginalWebSocket = window.__GMGN_ORIGINAL_WS; // 始终引用真正的原生 WS
+    window.__MARKET_VOICE_TOGGLE_HANDLER = (event) => {
+        const detail = event && event.detail;
+        window.__GMGN_AUDIO_ENABLED = !!(detail && detail.enabled);
+        if (detail && detail.useGmgnTwitterRemark !== undefined) {
+            window.__GMGN_USE_TWITTER_REMARK = detail.useGmgnTwitterRemark === true;
+        }
+    };
+    window.addEventListener(TOGGLE_EVENT, window.__MARKET_VOICE_TOGGLE_HANDLER);
 
-    window.__GMGN_AUDIO_ENABLED = true;
-    window.addEventListener('GMGN_AUDIO_TOGGLE', function (e) {
-        window.__GMGN_AUDIO_ENABLED = e.detail.enabled;
-    });
+    if (window.__MARKET_VOICE_PING_HANDLER) {
+        window.removeEventListener(PING_EVENT, window.__MARKET_VOICE_PING_HANDLER);
+    }
+    window.__MARKET_VOICE_PING_HANDLER = () => window.dispatchEvent(new CustomEvent(READY_EVENT));
+    window.addEventListener(PING_EVENT, window.__MARKET_VOICE_PING_HANDLER);
 
-    window.WebSocket = function (url, protocols) {
-        console.log(`🔗 [行情语音助手 - Inject] 成功捕获 WebSocket 连接创建:`, url);
-        const ws = new OriginalWebSocket(url, protocols);
+    const observedSockets = window.__MARKET_VOICE_OBSERVED_SOCKETS || new WeakSet();
+    window.__MARKET_VOICE_OBSERVED_SOCKETS = observedSockets;
+    let lastParseWarningAt = 0;
 
-        ws.addEventListener('message', function (event) {
-            if (!window.__GMGN_AUDIO_ENABLED) return;
-            if (typeof event.data !== 'string') return;
+    function parseSocketPayload(raw) {
+        let parsed = JSON.parse(raw.replace(/^\d+/, ''));
+        if (Array.isArray(parsed) && parsed.length >= 2) parsed = parsed[1];
+        if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+        return parsed;
+    }
+
+    function resolveGmgnRemark(tweetData) {
+        if (!twitterNameUtils) return '';
+        try {
+            if (window.__GMGN_USE_TWITTER_REMARK
+                && typeof twitterNameUtils.resolveGmgnRemark === 'function') {
+                return twitterNameUtils.resolveGmgnRemark(tweetData, window.localStorage);
+            }
+            if (typeof twitterNameUtils.extractGmgnRemark === 'function') {
+                return twitterNameUtils.extractGmgnRemark(tweetData);
+            }
+        } catch (error) { }
+        return '';
+    }
+
+    function dispatchTwitter(data) {
+        const triggers = new Map();
+        for (const tweetData of data.slice(0, MAX_BATCH_ITEMS)) {
+            if (!tweetData || !tweetData.u || typeof tweetData.u.s !== 'string') continue;
+            const actionType = typeof tweetData.tw === 'string' ? tweetData.tw : 'unknown';
+            const eventId = tweetData.id || tweetData.tid || tweetData.tweet_id || tweetData.twid
+                || tweetData.h || tweetData.ts || tweetData.ct
+                || (tweetData.t && (tweetData.t.id || tweetData.t.tid || tweetData.t.ts))
+                || '';
+            const id = tweetData.u.s.slice(0, 160);
+            const key = `${id}:${actionType}:${String(eventId).slice(0, 200)}`;
+            triggers.set(key, {
+                id,
+                tw: actionType.slice(0, 40),
+                name: String(tweetData.u.n || id).slice(0, 160),
+                gmgnRemark: resolveGmgnRemark(tweetData),
+                eventId: String(eventId).slice(0, 200)
+            });
+        }
+        if (triggers.size > 0) {
+            window.dispatchEvent(new CustomEvent('TWITTER_WS_MSG_RECEIVED', {
+                detail: { triggers: Array.from(triggers.values()) }
+            }));
+        }
+    }
+
+    function dispatchWallet(data) {
+        for (const item of data.slice(0, MAX_BATCH_ITEMS)) {
+            if (!item || typeof item !== 'object') continue;
+            window.dispatchEvent(new CustomEvent('GMGN_WALLET_MSG', { detail: item }));
+        }
+    }
+
+    function observeSocket(socket) {
+        if (!socket || observedSockets.has(socket)) return;
+        observedSockets.add(socket);
+        socket.addEventListener('message', (event) => {
+            if (!window.__GMGN_AUDIO_ENABLED || typeof event.data !== 'string') return;
             const isTwitter = event.data.includes('twitter_user_monitor_basic');
             const isWallet = event.data.includes('following_wallet_activity');
             if (!isTwitter && !isWallet) return;
 
             try {
-                let payloadStr = event.data.replace(/^\d+/, '');
-                if (!payloadStr) return;
-                let parsed = JSON.parse(payloadStr);
-
-                if (Array.isArray(parsed) && parsed.length >= 2) parsed = parsed[1];
-                if (typeof parsed === 'string') parsed = JSON.parse(parsed);
-
-                if (parsed && parsed.channel === 'twitter_user_monitor_basic' && parsed.data && Array.isArray(parsed.data)) {
-
-                    const triggersMap = new Map();
-
-                    parsed.data.forEach(tweetData => {
-                        if (!tweetData) return;
-                        const actionType = tweetData.tw || 'unknown';
-                        const eventId = tweetData.id || tweetData.tid || tweetData.tweet_id || tweetData.twid
-                            || tweetData.h || tweetData.ts || tweetData.ct
-                            || (tweetData.t && (tweetData.t.id || tweetData.t.tid || tweetData.t.ts))
-                            || '';
-
-                        // 🎯 核心修正：提取推特 ID (u.s) 和显示名称 (u.n)，用于 TTS 播报
-                        if (tweetData.u && tweetData.u.s) {
-                            triggersMap.set(`${tweetData.u.s}:${actionType}:${eventId}`, {
-                                id: tweetData.u.s,
-                                actionType: actionType,
-                                displayName: tweetData.u.n || tweetData.u.s, // 优先使用显示名称，降级使用 ID
-                                eventId: eventId
-                            });
-                        }
-                    });
-
-                    if (triggersMap.size > 0) {
-                        const triggersArray = Array.from(triggersMap.values()).map((data) => ({
-                            id: data.id,
-                            tw: data.actionType,
-                            name: data.displayName,
-                            eventId: data.eventId
-                        }));
-
-                        window.dispatchEvent(new CustomEvent('TWITTER_WS_MSG_RECEIVED', {
-                            detail: { triggers: triggersArray }
-                        }));
-                    }
-                } else if (parsed && parsed.channel === 'following_wallet_activity' && parsed.data && Array.isArray(parsed.data)) {
-                    parsed.data.forEach(item => {
-                        // 取消 cnt === "processed" 的过滤，交由 content.js 基于 txHash 进行去重，防止部分交易只有 confirm 导致漏播
-                        window.dispatchEvent(new CustomEvent('GMGN_WALLET_MSG', {
-                            detail: item
-                        }));
-                    });
+                const parsed = parseSocketPayload(event.data);
+                if (parsed && parsed.channel === 'twitter_user_monitor_basic' && Array.isArray(parsed.data)) {
+                    dispatchTwitter(parsed.data);
+                } else if (parsed && parsed.channel === 'following_wallet_activity' && Array.isArray(parsed.data)) {
+                    dispatchWallet(parsed.data);
                 }
             } catch (error) {
-                console.error("❌ [行情语音助手 - Inject] 数据解析异常:", error, event.data);
+                const now = Date.now();
+                if (now - lastParseWarningAt > 30_000) {
+                    lastParseWarningAt = now;
+                    console.warn(`${LOG_PREFIX} WebSocket 数据解析失败:`, error && error.message || error);
+                }
             }
         });
+    }
 
-        return ws;
-    };
-    window.WebSocket.prototype = OriginalWebSocket.prototype;
+    let websocketProxy;
+    websocketProxy = new Proxy(originalWebSocket, {
+        construct(target, args, newTarget) {
+            const effectiveTarget = newTarget === websocketProxy ? target : newTarget;
+            const socket = Reflect.construct(target, args, effectiveTarget);
+            observeSocket(socket);
+            return socket;
+        }
+    });
+
+    window.WebSocket = websocketProxy;
+    window.dispatchEvent(new CustomEvent(READY_EVENT));
+    console.log(`${LOG_PREFIX} WebSocket 监听已就绪`);
 })();

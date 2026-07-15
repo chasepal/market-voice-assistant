@@ -10,6 +10,7 @@
 - 自定义音频
 - 钱包备注和过滤设置
 - 音量、语速、音调
+- 是否优先播报 GMGN 社媒备注
 - 使用者自己填写的 Azure Speech Region 和 Key
 - 跨标签页去重所需的短期事件记录
 
@@ -17,11 +18,13 @@
 
 扩展不会把运行状态写入 GMGN 页面的 localStorage。为兼容旧版本，扩展启动时只会删除旧版留下的 `gmgn_companion_local_event_v2:` 前缀记录，不会清理 GMGN 登录态或其它站点数据。
 
+开启「优先播报 GMGN 社媒备注」后，扩展只读当前 GMGN 页面已有的 `x-user-remark-cache` / `x-user-remark` 缓存，用推特账号匹配备注。它不会修改、复制或导出整份备注缓存；开关默认关闭。
+
 ## 网络请求
 
 扩展会在 GMGN 页面中读取页面事件，用于触发提醒。
 
-如果启用 Azure 官方神经语音，扩展会把需要播报的文本发送给使用者配置的 Azure Speech endpoint，以换取语音音频。Azure Key 会作为请求头发送给 Azure，不会发送给其它自定义中转服务。
+如果启用 Azure 官方神经语音，扩展会把需要播报的文本发送给使用者配置的 Azure Speech endpoint，以换取语音音频。开启 GMGN 备注播报时，这段文本可能包含被选中的单条备注。Azure Key 会作为请求头发送给 Azure，不会发送给其它自定义中转服务。
 
 ## 敏感信息建议
 

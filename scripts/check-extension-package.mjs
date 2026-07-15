@@ -59,6 +59,20 @@ function exactRelativePathExists(root, relativePath) {
 }
 
 function checkRequiredFiles(root, manifest, errors) {
+  const manifestFiles = new Set([
+    manifest.action?.default_popup,
+    manifest.background?.service_worker,
+    ...(manifest.content_scripts || []).flatMap((entry) => entry.js || []),
+  ].filter(Boolean));
+  for (const relativePath of manifestFiles) {
+    const fullPath = path.join(root, relativePath);
+    if (!exactRelativePathExists(root, relativePath)) {
+      errors.push(`${root}: missing manifest file ${relativePath}`);
+    } else if (fs.statSync(fullPath).size === 0) {
+      errors.push(`${root}: empty manifest file ${relativePath}`);
+    }
+  }
+
   const iconPaths = new Set();
   for (const value of Object.values(manifest.icons || {})) iconPaths.add(value);
   for (const value of Object.values(manifest.action?.default_icon || {})) iconPaths.add(value);
@@ -84,6 +98,30 @@ function checkRequiredFiles(root, manifest, errors) {
   }
 }
 
+function checkManifestPolicy(root, manifest, errors) {
+  const allowedPermissions = new Set(['storage', 'unlimitedStorage']);
+  const allowedHosts = new Set([
+    'https://*.gmgn.ai/*',
+    'https://gmgn.ai/*',
+    'https://*.tts.speech.microsoft.com/*',
+  ]);
+  const allowedContentMatches = new Set(['https://*.gmgn.ai/*', 'https://gmgn.ai/*']);
+
+  if (manifest.manifest_version !== 3) errors.push(`${root}: manifest_version must be 3`);
+  if (manifest.update_url) errors.push(`${root}: update_url is not allowed`);
+  for (const permission of manifest.permissions || []) {
+    if (!allowedPermissions.has(permission)) errors.push(`${root}: unexpected permission ${permission}`);
+  }
+  for (const host of manifest.host_permissions || []) {
+    if (!allowedHosts.has(host)) errors.push(`${root}: unexpected host permission ${host}`);
+  }
+  for (const script of manifest.content_scripts || []) {
+    for (const match of script.matches || []) {
+      if (!allowedContentMatches.has(match)) errors.push(`${root}: unexpected content-script match ${match}`);
+    }
+  }
+}
+
 function checkShareCopy(root, errors) {
   for (const file of walkFiles(root)) {
     if (file.includes(`${path.sep}lib${path.sep}`)) continue;
@@ -103,6 +141,7 @@ const errors = [];
 for (const root of roots) {
   const manifest = readManifest(root);
   checkRequiredFiles(root, manifest, errors);
+  checkManifestPolicy(root, manifest, errors);
   checkShareCopy(root, errors);
 }
 

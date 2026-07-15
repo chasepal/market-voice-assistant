@@ -7,7 +7,7 @@ let sharedAudioCtx = null; // 🌟 全局共享 AudioContext（必须在 _unlock
 const STORAGE_KEYS = [
     'twitterAudioMappings', 'customAudios', 'defaultAudio', 'isMasterEnabled',
     'enableTwitter', 'enableWallet', 'globalVolume', 'twitterVolume', 'walletVolume',
-    'eventFilters', 'playDefaultUnmapped', 'enableTTS', 'ttsVoice', 'ttsRate', 'ttsPitch',
+    'eventFilters', 'playDefaultUnmapped', 'enableTTS', 'useGmgnTwitterRemark', 'ttsVoice', 'ttsRate', 'ttsPitch',
     'twitterTts', 'walletTts', 'azureTts', 'walletFilters', 'walletDictionary'
 ];
 const DEFAULT_LOCAL_TTS = { voice: 'Sandy (中文（中国大陆）)', rate: '+0%', pitch: '+0%' };
@@ -266,6 +266,7 @@ function applyStorageConfig(result = {}) {
     if (configCache.eventFilters && configCache.eventFilters.other === undefined) configCache.eventFilters.other = true;
     if (result.playDefaultUnmapped !== undefined) configCache.playDefaultUnmapped = result.playDefaultUnmapped;
     if (result.enableTTS !== undefined) configCache.enableTTS = result.enableTTS;
+    if (result.useGmgnTwitterRemark !== undefined) configCache.useGmgnTwitterRemark = result.useGmgnTwitterRemark;
     if (result.twitterTts) configCache.twitterTts = result.twitterTts;
     if (result.walletTts) configCache.walletTts = result.walletTts;
     if (result.azureTts) configCache.azureTts = result.azureTts;
@@ -285,6 +286,7 @@ function initDefaultConfig(result = {}) {
     configCache.eventFilters = result.eventFilters || { ...DEFAULT_EVENT_FILTERS };
     configCache.playDefaultUnmapped = result.playDefaultUnmapped !== false;
     configCache.enableTTS = result.enableTTS !== false;
+    configCache.useGmgnTwitterRemark = result.useGmgnTwitterRemark === true;
     configCache.twitterTts = result.twitterTts || { ...DEFAULT_LOCAL_TTS };
     configCache.walletTts = result.walletTts || { ...DEFAULT_LOCAL_TTS };
     configCache.azureTts = result.azureTts || { ...DEFAULT_AZURE_TTS };
@@ -816,7 +818,12 @@ document.addEventListener('visibilitychange', () => {
 });
 
 function syncMasterToggle() {
-    window.dispatchEvent(new CustomEvent('GMGN_AUDIO_TOGGLE', { detail: { enabled: configCache.isMasterEnabled } }));
+    window.dispatchEvent(new CustomEvent('GMGN_AUDIO_TOGGLE', {
+        detail: {
+            enabled: configCache.isMasterEnabled,
+            useGmgnTwitterRemark: configCache.useGmgnTwitterRemark === true
+        }
+    }));
 }
 
 function convertBase64ToBlobUrl(customAudiosObj) {
@@ -966,6 +973,10 @@ chrome.storage.onChanged.addListener(async (changes, namespace) => {
         if (changes.enableTTS) {
             configCache.enableTTS = changes.enableTTS.newValue;
         }
+        if (changes.useGmgnTwitterRemark) {
+            configCache.useGmgnTwitterRemark = changes.useGmgnTwitterRemark.newValue === true;
+            syncMasterToggle();
+        }
         if (changes.twitterTts) configCache.twitterTts = changes.twitterTts.newValue;
         if (changes.walletTts) configCache.walletTts = changes.walletTts.newValue;
         if (changes.azureTts) configCache.azureTts = changes.azureTts.newValue;
@@ -1012,6 +1023,33 @@ function cleanTtsText(text) {
         .replace(/[\p{Extended_Pictographic}\p{Regional_Indicator}\p{Emoji_Modifier}\uFE0E\uFE0F\u200D\u20E3]/gu, '')
         .replace(/\s+/g, ' ')
         .trim();
+}
+
+function chooseTwitterSpeakerName(trigger = {}, rule = null) {
+    const localRemark = (typeof rule === 'object' && rule !== null) ? rule.remark : '';
+    const nameUtils = globalThis.__MARKET_VOICE_TWITTER_NAME_UTILS__;
+    let gmgnRemark = trigger.gmgnRemark;
+    if (!gmgnRemark && configCache.useGmgnTwitterRemark === true
+        && nameUtils && typeof nameUtils.findGmgnRemarkInStorage === 'function') {
+        gmgnRemark = nameUtils.findGmgnRemarkInStorage(trigger.id, globalThis.localStorage);
+    }
+    const options = {
+        localRemark,
+        gmgnRemark,
+        displayName: trigger.name,
+        twitterId: trigger.id,
+        useGmgnRemark: configCache.useGmgnTwitterRemark === true
+    };
+    if (nameUtils && typeof nameUtils.chooseSpeakerName === 'function') {
+        const selected = nameUtils.chooseSpeakerName(options);
+        if (selected) return selected;
+    }
+
+    return String(localRemark
+        || (options.useGmgnRemark ? gmgnRemark : '')
+        || trigger.name
+        || trigger.id
+        || '').trim();
 }
 
 function scoreLocalVoice(voice) {
@@ -1268,7 +1306,6 @@ function processTwitterMessage(e, fingerprint) {
         if (!trigger || typeof trigger.id !== 'string') return;
 
         const twitterId = trigger.id.trim().toLowerCase();
-        const displayName = trigger.name || twitterId; // 🎤 获取显示名称，用于 TTS 播报
         const rawActionType = trigger.tw;
 
         const knownTypes = ['tweet', 'repost', 'reply', 'quote'];
@@ -1306,11 +1343,7 @@ function processTwitterMessage(e, fingerprint) {
                 // 只有通用提示音才需要 TTS，人物专属音频不需要
                 const genericSounds = ['default.MP3', 'preset1.MP3'];
                 if (configCache.enableTTS && genericSounds.includes(mappedAudioId)) {
-                    // 提取播报名称：优先使用 remark，其次用显示名称，最后降级到 ID
-                    let speakerName = displayName;
-                    if (typeof rule === 'object' && rule !== null && rule.remark) {
-                        speakerName = rule.remark;
-                    }
+                    const speakerName = chooseTwitterSpeakerName(trigger, rule);
 
                     ttsInfo = `${speakerName} 发推啦`;
                     // 🚀 如果开启了 TTS，则完全抛弃原有的兜底铃声，只保留 TTS
@@ -1354,7 +1387,7 @@ function processTwitterMessage(e, fingerprint) {
                 if (configCache.enableTTS) {
                     const firstTrigger = e.detail.triggers.find(t => t && typeof t.id === 'string');
                     if (firstTrigger) {
-                        const speakerName = firstTrigger.name || firstTrigger.id.trim();
+                        const speakerName = chooseTwitterSpeakerName(firstTrigger, null);
                         unmappedTTS = `${speakerName} 发推啦`;
                     }
                 }

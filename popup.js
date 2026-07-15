@@ -202,6 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
         enableWalletToggle: document.getElementById('enableWalletToggle'),
         playDefaultToggle: document.getElementById('playDefaultToggle'), // 🌟 新增的未映射播放开关
         enableTTSToggle: document.getElementById('enableTTSToggle'), // 🌟 新增的 TTS 开关
+        useGmgnTwitterRemarkToggle: document.getElementById('useGmgnTwitterRemarkToggle'),
         ttsProviderSelect: document.getElementById('ttsProviderSelect'),
         azureTtsPanel: document.getElementById('azureTtsPanel'),
         azureRegionInput: document.getElementById('azureRegionInput'),
@@ -363,12 +364,19 @@ document.addEventListener('DOMContentLoaded', () => {
     setupCustomDropdown('addSelectTrigger', 'addSelectMenu', 'addSelectSearch', 'addSelectList', 'addAudioValue', 'addAudioName');
     setupCustomDropdown('editSelectTrigger', 'editSelectMenu', 'editSelectSearch', 'editSelectList', 'editAudioValue', 'editAudioName');
 
+    function updateGmgnRemarkSettingState() {
+        const setting = document.getElementById('gmgnRemarkSubSetting');
+        if (!setting) return;
+        const enabled = els.enableTTSToggle.checked;
+        setting.style.opacity = enabled ? '1' : '0.4';
+        setting.style.pointerEvents = enabled ? 'auto' : 'none';
+    }
 
     function loadData() {
         chrome.storage.local.get([
             'twitterAudioMappings', 'customAudios', 'isMasterEnabled', 'enableTwitter', 'enableWallet', 
             'globalVolume', 'twitterVolume', 'walletVolume', 'eventFilters', 'playDefaultUnmapped', 
-            'enableTTS', 'ttsVoice', 'ttsRate', 'ttsPitch', 'twitterTts', 'walletTts', 
+            'enableTTS', 'useGmgnTwitterRemark', 'ttsVoice', 'ttsRate', 'ttsPitch', 'twitterTts', 'walletTts',
             'azureTts', 'walletFilters', 'walletDictionary'
         ], (result) => {
             const mappings = result.twitterAudioMappings || {};
@@ -382,6 +390,8 @@ document.addEventListener('DOMContentLoaded', () => {
             els.enableWalletToggle.checked = result.enableWallet !== false;
             els.playDefaultToggle.checked = result.playDefaultUnmapped !== false;
             els.enableTTSToggle.checked = result.enableTTS !== false;
+            els.useGmgnTwitterRemarkToggle.checked = result.useGmgnTwitterRemark === true;
+            updateGmgnRemarkSettingState();
             const azureTts = result.azureTts || { provider: 'local', region: '', key: '', voice: 'zh-CN-XiaoxiaoNeural' };
             els.ttsProviderSelect.value = azureTts.provider || 'local';
             els.azureRegionInput.value = azureTts.region || '';
@@ -960,7 +970,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     els.enableTTSToggle.addEventListener('change', (e) => {
         chrome.storage.local.set({ enableTTS: e.target.checked }, () => {
+            updateGmgnRemarkSettingState();
             showToast(e.target.checked ? '已开启语音播报' : '已关闭语音播报');
+        });
+    });
+    els.useGmgnTwitterRemarkToggle.addEventListener('change', (e) => {
+        chrome.storage.local.set({ useGmgnTwitterRemark: e.target.checked }, () => {
+            showToast(e.target.checked ? '将优先播报 GMGN 备注' : '将播报推特昵称');
         });
     });
     els.uploadBtn.addEventListener('click', async () => {

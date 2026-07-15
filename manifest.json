@@ -11,17 +11,20 @@
       "service_worker": "background.js"
    },
    "content_scripts": [ {
-      "js": [ "inject.js" ],
-      "matches": [ "*://*.gmgn.ai/*", "*://gmgn.ai/*" ],
+      "js": [ "twitter-name-utils.js", "inject.js" ],
+      "matches": [ "https://*.gmgn.ai/*", "https://gmgn.ai/*" ],
       "run_at": "document_start",
       "world": "MAIN"
    }, {
-      "js": [ "content.js" ],
-      "matches": [ "*://*.gmgn.ai/*", "*://gmgn.ai/*" ],
+      "js": [ "twitter-name-utils.js", "content.js" ],
+      "matches": [ "https://*.gmgn.ai/*", "https://gmgn.ai/*" ],
       "run_at": "document_start"
    } ],
-   "description": "本地配置的 GMGN 行情与钱包语音提醒工具，Azure Key 仅保存在本机 Chrome storage",
-   "host_permissions": [ "*://*.gmgn.ai/*", "*://gmgn.ai/*", "https://*.tts.speech.microsoft.com/*" ],
+   "content_security_policy": {
+      "extension_pages": "script-src 'self'; object-src 'none';"
+   },
+   "description": "本地配置的 GMGN 行情与钱包语音提醒工具，可选昵称或 GMGN 社媒备注播报",
+   "host_permissions": [ "https://*.gmgn.ai/*", "https://gmgn.ai/*", "https://*.tts.speech.microsoft.com/*" ],
    "icons": {
       "128": "images/icon128.png",
       "16": "images/icon16.png",
@@ -30,9 +33,9 @@
    "manifest_version": 3,
    "name": "行情语音助手",
    "permissions": [ "storage", "unlimitedStorage" ],
-   "version": "1.7.4",
+   "version": "1.8.3",
    "web_accessible_resources": [ {
-      "matches": [ "*://*.gmgn.ai/*", "*://gmgn.ai/*" ],
-      "resources": [ "inject.js", "sounds/default.MP3", "sounds/preset1.MP3", "sounds/alert1.MP3", "sounds/alert2.MP3", "sounds/alert3.MP3" ]
+      "matches": [ "https://*.gmgn.ai/*", "https://gmgn.ai/*" ],
+      "resources": [ "sounds/default.MP3", "sounds/preset1.MP3", "sounds/alert1.MP3", "sounds/alert2.MP3", "sounds/alert3.MP3" ]
    } ]
 }
